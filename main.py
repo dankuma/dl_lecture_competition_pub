@@ -2,7 +2,6 @@ import re
 import random
 import time
 from statistics import mode
-
 from PIL import Image
 import numpy as np
 import pandas
@@ -10,7 +9,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from torchvision import transforms
-
+from torch.utils.data import Dataset
 
 def set_seed(seed):
     random.seed(seed)
@@ -62,7 +61,7 @@ def process_text(text):
 
 
 # 1. データローダーの作成
-class VQADataset(torch.utils.data.Dataset):
+class VQADataset(Dataset):
     def __init__(self, df_path, image_dir, transform=None, answer=True):
         self.transform = transform  # 画像の前処理
         self.image_dir = image_dir  # 画像ファイルのディレクトリ
@@ -93,6 +92,16 @@ class VQADataset(torch.utils.data.Dataset):
                     if word not in self.answer2idx:
                         self.answer2idx[word] = len(self.answer2idx)
             self.idx2answer = {v: k for k, v in self.answer2idx.items()}  # 逆変換用の辞書(answer)
+
+        # ここにデータ拡張の設定を追加する
+        if self.transform is not None:
+            self.transform = transforms.Compose([
+                transforms.Resize((256, 256)),  # 画像を256x256にリサイズ
+                transforms.RandomResizedCrop(224),  # ランダムに切り抜いて224x224にリサイズ
+                transforms.RandomHorizontalFlip(),  # ランダムに水平反転
+                transforms.ToTensor(),  # Tensorに変換
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 画像の正規化
+            ])
 
     def update_dict(self, dataset):
         """
@@ -378,7 +387,7 @@ def main():
     model = VQAModel(vocab_size=len(train_dataset.question2idx)+1, n_answer=len(train_dataset.answer2idx)).to(device)
 
     # optimizer / criterion
-    num_epoch = 20
+    num_epoch = 1
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
